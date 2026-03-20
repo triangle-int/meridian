@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.3.0](https://github.com/rynfar/opencode-claude-max-proxy/compare/v1.2.0...v1.3.0) (2026-03-20)
+
+
+### Features
+
+* add session resume support for conversation continuity ([c40ff63](https://github.com/rynfar/opencode-claude-max-proxy/commit/c40ff63149db52c68ebde816aaf13546cfd2d27f))
+* session resume support for conversation continuity ([1e98be0](https://github.com/rynfar/opencode-claude-max-proxy/commit/1e98be0f8ffb9ff1c4d0d2c244c84a34b2504f32))
+
+
+### Bug Fixes
+
+* deduplicate message_start/stop events in multi-turn streaming ([23a0044](https://github.com/rynfar/opencode-claude-max-proxy/commit/23a0044bc4d06be97b002e83438b951c04d2251b)), closes [#20](https://github.com/rynfar/opencode-claude-max-proxy/issues/20)
+* deduplicate streaming events for cleaner multi-turn responses ([b98b2dd](https://github.com/rynfar/opencode-claude-max-proxy/commit/b98b2dd130acc464845f718177217ce66ce53a2f))
+* increase session TTL to 24 hours, verified end-to-end ([181a5fe](https://github.com/rynfar/opencode-claude-max-proxy/commit/181a5fe741507291fcad3bbb64b97076f45f2ba9))
+* pass working directory to SDK for correct system prompt ([c0a3120](https://github.com/rynfar/opencode-claude-max-proxy/commit/c0a3120d3f5db54a429ca759017f5838ff94c33f))
+* pass working directory to SDK query for correct system prompt ([d7bfc42](https://github.com/rynfar/opencode-claude-max-proxy/commit/d7bfc4267dcc70809ee341ed7fed576c21297c13)), closes [#18](https://github.com/rynfar/opencode-claude-max-proxy/issues/18)
+
 ## [1.2.0](https://github.com/rynfar/opencode-claude-max-proxy/compare/v1.1.1...v1.2.0) (2026-03-20)
 
 
