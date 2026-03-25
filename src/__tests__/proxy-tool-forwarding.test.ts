@@ -307,15 +307,32 @@ describe("Phase 1: Non-streaming - tool_use forwarding", () => {
 // ============================================================
 
 describe("Proxy basics", () => {
-  it("should return health status on GET /", async () => {
+  it("should return status JSON on GET / with Accept: application/json", async () => {
     const app = createTestApp()
-    const req = new Request("http://localhost/", { method: "GET" })
+    const req = new Request("http://localhost/", {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+    })
     const response = await app.fetch(req)
     const body = await response.json() as any
 
     expect(body.status).toBe("ok")
+    expect(body.service).toBe("meridian")
     expect(body.endpoints).toContain("/v1/messages")
     expect(body.endpoints).toContain("/messages")
+  })
+
+  it("should return landing page HTML on GET / from a browser", async () => {
+    const app = createTestApp()
+    const req = new Request("http://localhost/", {
+      method: "GET",
+      headers: { "Accept": "text/html" },
+    })
+    const response = await app.fetch(req)
+    const html = await response.text()
+
+    expect(response.headers.get("content-type")).toContain("text/html")
+    expect(html).toContain("Meridian")
   })
 
   it("should accept requests on both /v1/messages and /messages", async () => {

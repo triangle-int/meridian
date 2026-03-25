@@ -17,7 +17,7 @@ import { fuzzyMatchAgentName } from "./agentMatch"
 import { buildAgentDefinitions } from "./agentDefs"
 import { createPassthroughMcpServer, stripMcpPrefix, PASSTHROUGH_MCP_NAME, PASSTHROUGH_MCP_PREFIX } from "./passthroughTools"
 
-import { telemetryStore, diagnosticLog, createTelemetryRoutes } from "../telemetry"
+import { telemetryStore, diagnosticLog, createTelemetryRoutes, landingHtml } from "../telemetry"
 import type { RequestMetric } from "../telemetry"
 import { classifyError } from "./errors"
 import { mapModelToClaudeModel, resolveClaudeExecutableAsync, isClosedControllerError } from "./models"
@@ -60,13 +60,17 @@ export function createProxyServer(config: Partial<ProxyConfig> = {}): ProxyServe
   app.use("*", cors())
 
   app.get("/", (c) => {
-    return c.json({
-      status: "ok",
-      service: "claude-max-proxy",
-      version: "1.0.0",
-      format: "anthropic",
-      endpoints: ["/v1/messages", "/messages"]
-    })
+    // API clients get JSON, browsers get the landing page
+    const accept = c.req.header("accept") || ""
+    if (accept.includes("application/json") && !accept.includes("text/html")) {
+      return c.json({
+        status: "ok",
+        service: "meridian",
+        format: "anthropic",
+        endpoints: ["/v1/messages", "/messages", "/telemetry", "/health"]
+      })
+    }
+    return c.html(landingHtml)
   })
 
   // --- Concurrency Control ---
@@ -980,9 +984,10 @@ export async function startProxyServer(config: Partial<ProxyConfig> = {}): Promi
     hostname: finalConfig.host,
   }, (info) => {
     if (!finalConfig.silent) {
-      console.log(`Claude Max Proxy (Anthropic API) running at http://${finalConfig.host}:${info.port}`)
-      console.log(`\nTo use with OpenCode, run:`)
-      console.log(`  ANTHROPIC_API_KEY=dummy ANTHROPIC_BASE_URL=http://${finalConfig.host}:${info.port} opencode`)
+      console.log(`Meridian running at http://${finalConfig.host}:${info.port}`)
+      console.log(`Telemetry dashboard: http://${finalConfig.host}:${info.port}/telemetry`)
+      console.log(`\nPoint any Anthropic-compatible tool at this endpoint:`)
+      console.log(`  ANTHROPIC_API_KEY=x ANTHROPIC_BASE_URL=http://${finalConfig.host}:${info.port}`)
     }
   }) as Server
 

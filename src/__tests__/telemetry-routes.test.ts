@@ -38,7 +38,7 @@ describe("Telemetry routes", () => {
     expect(res.status).toBe(200)
     const html = await res.text()
     expect(html).toContain("<!DOCTYPE html>")
-    expect(html).toContain("Claude Max Proxy")
+    expect(html).toContain("Meridian")
     expect(html).toContain("Telemetry")
   })
 

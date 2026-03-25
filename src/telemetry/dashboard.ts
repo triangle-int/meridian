@@ -8,7 +8,7 @@ export const dashboardHtml = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Claude Max Proxy — Telemetry</title>
+<title>Meridian — Telemetry</title>
 <style>
   :root {
     --bg: #0d1117; --surface: #161b22; --border: #30363d;
@@ -81,7 +81,7 @@ export const dashboardHtml = `<!DOCTYPE html>
 </style>
 </head>
 <body>
-<h1>Claude Max Proxy</h1>
+<h1>Meridian</h1>
 <div class="subtitle">Request Performance Telemetry</div>
 
 <div class="refresh-bar">

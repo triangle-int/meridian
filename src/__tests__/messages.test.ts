@@ -48,6 +48,25 @@ describe("normalizeContent", () => {
     expect(result).toContain('"type":"image"')
   })
 
+  it("produces stable hashes when cache_control is added to text blocks", () => {
+    const without = [{ type: "text", text: "hello" }]
+    const withCC = [{ type: "text", text: "hello", cache_control: { type: "ephemeral" } }]
+    // text blocks extract only .text, so cache_control is already ignored
+    expect(normalizeContent(without)).toBe(normalizeContent(withCC))
+  })
+
+  it("produces stable hashes when cache_control is added to tool_result content blocks", () => {
+    const without = [{ type: "tool_result", tool_use_id: "tu_1", content: [{ type: "text", text: "result" }] }]
+    const withCC = [{ type: "tool_result", tool_use_id: "tu_1", content: [{ type: "text", text: "result", cache_control: { type: "ephemeral" } }] }]
+    expect(normalizeContent(without)).toBe(normalizeContent(withCC))
+  })
+
+  it("produces stable hashes when cache_control is added to unknown block types", () => {
+    const without = [{ type: "image", data: "base64" }]
+    const withCC = [{ type: "image", data: "base64", cache_control: { type: "ephemeral" } }]
+    expect(normalizeContent(without)).toBe(normalizeContent(withCC))
+  })
+
   it("converts non-string non-array to string", () => {
     expect(normalizeContent(42)).toBe("42")
     expect(normalizeContent(null)).toBe("null")

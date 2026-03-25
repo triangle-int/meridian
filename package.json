@@ -1,11 +1,12 @@
 {
   "name": "opencode-claude-max-proxy",
   "version": "1.17.0",
-  "description": "Use your Claude Max subscription with OpenCode via proxy server",
+  "description": "Local Anthropic API powered by your Claude Max subscription. One subscription, every agent.",
   "type": "module",
   "main": "./dist/server.js",
   "types": "./dist/proxy/server.d.ts",
   "bin": {
+    "meridian": "./dist/cli.js",
     "claude-max-proxy": "./dist/cli.js"
   },
   "exports": {
@@ -40,20 +41,23 @@
   },
   "files": [
     "dist/",
+    "assets/",
     "README.md"
   ],
   "keywords": [
-    "opencode",
-    "opencode-ai",
-    "opencode-plugin",
+    "meridian",
     "claude",
     "claude-max",
     "claude-code",
     "anthropic",
+    "anthropic-api",
+    "claude-agent-sdk",
     "ai-coding",
     "ai-assistant",
     "proxy",
-    "claude-agent-sdk",
+    "opencode",
+    "cline",
+    "aider",
     "llm",
     "coding-assistant"
   ],

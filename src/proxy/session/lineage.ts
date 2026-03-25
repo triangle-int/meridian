@@ -172,8 +172,11 @@ export function verifyLineage(
     return { type: "compaction", session: cached }
   }
 
-  // Undo: prefix preserved (beginning intact) but suffix changed
-  if (prefixOverlap > 0 && suffixOverlap === 0) {
+  // Undo: prefix preserved (beginning intact) but suffix changed,
+  // AND the conversation shrank (fewer messages). If the conversation grew
+  // (messages.length > cached.messageCount), the client added new messages
+  // after modifying a previous one — that's a continuation, not an undo.
+  if (prefixOverlap > 0 && suffixOverlap === 0 && messages.length <= cached.messageCount) {
     // Find the SDK UUID at the last matching position.
     let rollbackUuid: string | undefined
     if (cached.sdkMessageUuids) {
@@ -188,6 +191,19 @@ export function verifyLineage(
     console.error(`[PROXY] ${undoMsg}`)
     diagnosticLog.lineage(undoMsg)
     return { type: "undo", session: cached, prefixOverlap, rollbackUuid }
+  }
+
+  // Modified continuation: most prefix matches but a message was modified
+  // (e.g., cache_control added) and new messages were appended. Treat as
+  // continuation — update stored hashes and resume normally.
+  if (prefixOverlap > 0 && messages.length > cached.messageCount) {
+    const modifiedMsg = `Modified continuation (key=${cacheKey.slice(0, 8)}…): prefix overlap ${prefixOverlap}/${cached.messageHashes.length}, incoming ${messages.length} msgs. Allowing resume.`
+    console.error(`[PROXY] ${modifiedMsg}`)
+    diagnosticLog.lineage(modifiedMsg)
+    cached.lineageHash = computeLineageHash(messages.slice(0, messages.length))
+    cached.messageHashes = incomingHashes
+    cached.messageCount = messages.length
+    return { type: "continuation", session: cached }
   }
 
   // No meaningful overlap — completely different conversation.

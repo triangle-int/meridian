@@ -1,301 +1,241 @@
-# opencode-claude-max-proxy
+<p align="center">
+  <img src="assets/banner.svg" alt="Meridian" width="800"/>
+</p>
 
-[![npm version](https://img.shields.io/npm/v/opencode-claude-max-proxy.svg)](https://www.npmjs.com/package/opencode-claude-max-proxy)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![GitHub stars](https://img.shields.io/github/stars/rynfar/opencode-claude-max-proxy.svg)](https://github.com/rynfar/opencode-claude-max-proxy/stargazers)
+<p align="center">
+  <a href="https://github.com/rynfar/opencode-claude-max-proxy/releases"><img src="https://img.shields.io/github/v/release/rynfar/opencode-claude-max-proxy?style=flat-square&color=6366f1&label=release" alt="Release"></a>
+  <a href="https://www.npmjs.com/package/opencode-claude-max-proxy"><img src="https://img.shields.io/npm/v/opencode-claude-max-proxy?style=flat-square&color=8b5cf6&label=npm" alt="npm"></a>
+  <a href="#"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-a78bfa?style=flat-square" alt="Platform"></a>
+  <a href="#"><img src="https://img.shields.io/badge/license-MIT-c4b5fd?style=flat-square" alt="License"></a>
+</p>
 
-A transparent proxy that lets a Claude Max subscription power [OpenCode](https://opencode.ai), preserving multi-model agent routing.
+---
 
-> **Just want to get running?** The [opencode-with-claude](https://github.com/ianjwhite99/opencode-with-claude) installer handles everything — proxy, CLI, config — in one command. The rest of this README covers the proxy itself.
+Meridian turns your Claude Max subscription into a local Anthropic API. Any tool that speaks the Anthropic protocol — OpenCode, Crush, Cline, Continue, Aider — connects to Meridian and gets Claude, powered by your existing subscription through the official Claude Code SDK.
 
-## Why This Exists
+Harness Claude, your way.
 
-OpenCode targets the Anthropic API. Claude Max provides access to Claude via the [Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk). This proxy bridges the two.
+> [!IMPORTANT]
+> **🚀 This project is becoming Meridian.** The npm package will be renamed from `opencode-claude-max-proxy` to `meridian` in an upcoming release. Your current install and all existing configurations will continue to work — no action needed yet.
 
-The problem: if the Agent SDK executes tools directly, everything runs through Claude — even when your OpenCode config routes agents to GPT, Gemini, or other providers. The proxy solves this by intercepting tool calls and forwarding them to OpenCode, so your agent routing stays intact.
-
-## How It Works
-
-```
-OpenCode ──► Proxy (localhost) ──► Claude Max (Agent SDK)
-                                        │
-                                   tool_use response
-                                        │
-             Proxy intercepts ◄─────────┘
-             (stop turn)
-                  │
-                  ▼
-             OpenCode agent system
-             (routes to GPT-5.4, Gemini, etc.)
-                  │
-                  ▼
-             Proxy resumes SDK ──► Claude continues
-                  │
-                  ▼
-OpenCode ◄── final response
-```
-
-The Claude Agent SDK exposes a `PreToolUse` hook that fires before any tool executes. Combined with `maxTurns: 1`, this gives precise control over the execution boundary:
-
-1. **Claude generates a response** with `tool_use` blocks (read a file, delegate to an agent, run a command)
-2. **The PreToolUse hook fires** — we capture the tool name, input, and ID, then return `decision: "block"`
-3. **The SDK stops** (blocked tool + maxTurns:1 = turn complete) and we have the full tool_use payload
-4. **The proxy returns it to OpenCode** as a standard Anthropic API response with `stop_reason: "tool_use"`
-5. **OpenCode handles everything** — file reads, shell commands, and crucially, `Task` delegation through its own agent system with full model routing
-6. **OpenCode sends `tool_result` back**, the proxy resumes the SDK session, and Claude continues
-
-From Claude's perspective, tool usage proceeds normally. From OpenCode's perspective, it's talking to the Anthropic API.
-
-## Prerequisites
-
-1. **Claude Max subscription** — [Subscribe here](https://claude.ai/settings/billing)
-2. **Claude CLI authenticated:**
-   ```bash
-   npm install -g @anthropic-ai/claude-code
-   claude login
-   ```
-3. **Clear any existing OpenCode Anthropic auth** — cached auth overrides the proxy:
-   ```bash
-   opencode auth logout   # select "anthropic" when prompted
-   ```
-
-## Install
-
-### npm (recommended)
+## Quick Start
 
 ```bash
+# Install
 npm install -g opencode-claude-max-proxy
+
+# Authenticate (one time)
+claude login
+
+# Start
+meridian
 ```
 
-### From Source
+Meridian starts on `http://127.0.0.1:3456`. Point any Anthropic-compatible tool at it:
 
 ```bash
-git clone https://github.com/rynfar/opencode-claude-max-proxy
-cd opencode-claude-max-proxy
-bun install
+ANTHROPIC_API_KEY=x ANTHROPIC_BASE_URL=http://127.0.0.1:3456 opencode
 ```
 
-> Requires [Bun](https://bun.sh): `curl -fsSL https://bun.sh/install | bash`
+The API key value doesn't matter — Meridian authenticates through your Claude Max session, not API keys.
 
-### Docker
+## Why Meridian?
+
+You're paying for Claude Max. It includes programmatic access through the Claude Code SDK. But your favorite coding tools expect an Anthropic API endpoint and an API key.
+
+Meridian bridges that gap. It runs locally, accepts standard Anthropic API requests, and routes them through the SDK using your Max subscription. Claude does the work — Meridian just lets you pick the tool.
+
+<p align="center">
+  <img src="assets/how-it-works.svg" alt="How Meridian works" width="920"/>
+</p>
+
+## Features
+
+- **Standard Anthropic API** — drop-in compatible with any tool that supports custom `base_url`
+- **Session management** — conversations persist across requests, survive compaction and undo, resume after proxy restarts
+- **Streaming** — full SSE streaming with MCP tool filtering
+- **Concurrent sessions** — run parent + subagent requests in parallel
+- **Passthrough mode** — forward tool calls to the client instead of executing internally
+- **Multimodal** — images, documents, and file attachments pass through to Claude
+- **Telemetry dashboard** — real-time performance metrics at `/telemetry`
+- **Cross-proxy resume** — sessions persist to disk and survive restarts
+- **Agent adapter pattern** — extensible architecture for supporting new agent protocols
+
+## Agent Setup
+
+### OpenCode
 
 ```bash
-git clone https://github.com/rynfar/opencode-claude-max-proxy
-cd opencode-claude-max-proxy
-docker compose up -d
-
-# Login to Claude inside the container (one-time)
-docker compose exec proxy claude login
-
-# Verify
-curl http://127.0.0.1:3456/health
+ANTHROPIC_API_KEY=x ANTHROPIC_BASE_URL=http://127.0.0.1:3456 opencode
 ```
 
-> On macOS, use `./bin/docker-auth.sh` to copy host credentials into the container (handles the keychain/scopes format difference). On Linux, volume-mounting `~/.claude` may work directly.
+Or use the [OpenCode plugin](src/plugin/claude-max-headers.ts) for automatic session header injection.
 
-## Connect OpenCode
+### Crush
 
-Once the proxy is running, point OpenCode at it via environment variables or config file.
-
-### Environment Variables
-
-```bash
-# Terminal 1: start the proxy
-CLAUDE_PROXY_PASSTHROUGH=1 claude-max-proxy
-# or: CLAUDE_PROXY_PASSTHROUGH=1 bun run proxy (from source)
-
-# Terminal 2+: connect OpenCode
-ANTHROPIC_API_KEY=dummy ANTHROPIC_BASE_URL=http://127.0.0.1:3456 opencode
-```
-
-`ANTHROPIC_API_KEY` can be any non-empty string. Authentication is handled by `claude login`.
-
-### Config File
-
-Set the proxy URL in `~/.config/opencode/opencode.json` (global) or your project's `opencode.json`:
-
-```json
+```jsonc
+// ~/.config/crush/crush.json
 {
-  "provider": {
-    "anthropic": {
-      "options": {
-        "baseURL": "http://127.0.0.1:3456",
-        "apiKey": "dummy"
-      }
+  "providers": {
+    "meridian": {
+      "type": "anthropic",
+      "base_url": "http://127.0.0.1:3456",
+      "api_key": "x",
+      "models": [
+        { "id": "claude-sonnet-4-5-20250514", "name": "Claude Sonnet 4.5" },
+        { "id": "claude-opus-4-20250514", "name": "Claude Opus 4" }
+      ]
     }
   }
 }
 ```
 
-This also works with OpenCode Desktop.
-
-## Modes
-
-### Passthrough (recommended)
+### Any Anthropic-compatible tool
 
 ```bash
-CLAUDE_PROXY_PASSTHROUGH=1 claude-max-proxy
+export ANTHROPIC_API_KEY=x
+export ANTHROPIC_BASE_URL=http://127.0.0.1:3456
+# Then start your tool normally
 ```
 
-All tool execution is forwarded to OpenCode. Multi-model agent routing works. Full agent system prompts are preserved.
+## Tested Agents
 
-### Internal
+| Agent | Status | Notes |
+|-------|--------|-------|
+| [OpenCode](https://github.com/opencode-ai/opencode) | ✅ Verified | Full tool support, session resume, streaming, subagents |
+| [Crush](https://github.com/charmbracelet/crush) | ✅ Verified | Tool execution, multi-turn, headless mode |
+| [Cline](https://github.com/cline/cline) | 🔲 Untested | Should work — standard Anthropic API |
+| [Continue](https://github.com/continuedev/continue) | 🔲 Untested | Should work — standard Anthropic API |
+| [Aider](https://github.com/paul-gauthier/aider) | 🔲 Untested | Should work — standard Anthropic API |
 
-```bash
-claude-max-proxy
+Tested an agent? [Open an issue](https://github.com/rynfar/opencode-claude-max-proxy/issues) and we'll add it.
+
+## Architecture
+
+Meridian is built as a modular proxy with clean separation of concerns:
+
+```
+src/proxy/
+├── server.ts              ← HTTP orchestration (routes, SSE streaming, concurrency)
+├── adapter.ts             ← AgentAdapter interface (extensibility point)
+├── adapters/opencode.ts   ← OpenCode-specific behavior
+├── query.ts               ← SDK query options builder
+├── errors.ts              ← Error classification
+├── models.ts              ← Model mapping (sonnet/opus/haiku)
+├── tools.ts               ← Tool blocking lists
+├── messages.ts            ← Content normalization
+├── session/
+│   ├── lineage.ts         ← Per-message hashing, mutation classification (pure)
+│   ├── fingerprint.ts     ← Conversation fingerprinting
+│   └── cache.ts           ← LRU session caches
+├── sessionStore.ts        ← Cross-proxy file-based session persistence
+├── agentDefs.ts           ← Subagent definition extraction
+└── passthroughTools.ts    ← Tool forwarding mode
 ```
 
-Tools execute inside the proxy via MCP. Subagents run on Claude via the SDK's native system. Simpler conceptually, but all agents use Claude regardless of your config.
+### Session Management
 
-|                       | Passthrough            | Internal            |
-| --------------------- | ---------------------- | ------------------- |
-| Tool execution        | OpenCode               | Proxy (MCP)         |
-| Agent delegation      | OpenCode → multi-model | SDK → Claude only   |
-| oh-my-opencode models | ✅ Respected           | ❌ All Claude       |
-| Agent system prompts  | ✅ Full                | ⚠️ Description only |
+Sessions map agent conversations to Claude SDK sessions. Meridian classifies every incoming request:
 
-## Agent Compatibility
+| Classification | What Happened | Action |
+|---------------|---------------|--------|
+| **Continuation** | New messages appended | Resume SDK session |
+| **Compaction** | Agent summarized old messages | Resume (suffix preserved) |
+| **Undo** | User rolled back messages | Fork at rollback point |
+| **Diverged** | Completely different conversation | Start fresh |
 
-The proxy extracts agent definitions from the `Task` tool description that OpenCode sends in each request. It works with:
+Sessions are stored in-memory (LRU) and persisted to `~/.cache/opencode-claude-max-proxy/sessions.json` for cross-proxy resume.
 
-- **Native OpenCode** — `build` and `plan` agents
-- **[oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode)** — `oracle`, `explore`, `librarian`, `sisyphus-junior`, `metis`, `momus`, etc.
-- **Custom agents** — anything defined in your `opencode.json`
+### Adding a New Agent
 
-In internal mode, a `PreToolUse` hook fuzzy-matches agent names (e.g., `general-purpose` → `general`, `Explore` → `explore`). In passthrough mode, OpenCode handles names directly.
+Implement the `AgentAdapter` interface in `src/proxy/adapters/`:
 
-## Session Resume
+```typescript
+interface AgentAdapter {
+  getSessionId(c: Context): string | undefined
+  extractWorkingDirectory(body: any): string | undefined
+  normalizeContent(content: any): string
+  getBlockedBuiltinTools(): readonly string[]
+  getAgentIncompatibleTools(): readonly string[]
+  getMcpServerName(): string
+  getAllowedMcpTools(): readonly string[]
+}
+```
 
-The proxy tracks SDK session IDs and resumes conversations on follow-up requests. Sessions are stored in `~/.cache/opencode-claude-max-proxy/sessions.json`, shared across all proxy instances.
-
-Lookup order:
-
-1. **Header-based** — use the included OpenCode plugin to inject session headers:
-   ```json
-   {
-     "plugin": ["./path/to/opencode-claude-max-proxy/src/plugin/claude-max-headers.ts"]
-   }
-   ```
-2. **Fingerprint-based** (automatic fallback) — hashes the first user message to match returning conversations
-
-Sessions expire after 24 hours.
+See [`adapters/opencode.ts`](src/proxy/adapters/opencode.ts) for reference.
 
 ## Configuration
 
-| Variable                            | Default   | Description                                              |
-| ----------------------------------- | --------- | -------------------------------------------------------- |
-| `CLAUDE_PROXY_PASSTHROUGH`          | (unset)   | Enable passthrough mode to forward all tools to OpenCode |
-| `CLAUDE_PROXY_PORT`                 | 3456      | Proxy server port                                        |
-| `CLAUDE_PROXY_HOST`                 | 127.0.0.1 | Proxy server host                                        |
-| `CLAUDE_PROXY_WORKDIR`              | (cwd)     | Working directory for Claude and tools                   |
-| `CLAUDE_PROXY_MAX_CONCURRENT`       | 1         | Max concurrent SDK sessions (increase with caution)      |
-| `CLAUDE_PROXY_IDLE_TIMEOUT_SECONDS` | 120       | Connection idle timeout                                  |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLAUDE_PROXY_PORT` | `3456` | Port to listen on |
+| `CLAUDE_PROXY_HOST` | `127.0.0.1` | Host to bind to |
+| `CLAUDE_PROXY_PASSTHROUGH` | unset | Forward tool calls to client instead of executing |
+| `CLAUDE_PROXY_MAX_CONCURRENT` | `10` | Maximum concurrent SDK sessions |
+| `CLAUDE_PROXY_MAX_SESSIONS` | `1000` | In-memory LRU session cache size |
+| `CLAUDE_PROXY_MAX_STORED_SESSIONS` | `10000` | File-based session store capacity |
+| `CLAUDE_PROXY_WORKDIR` | `cwd()` | Default working directory for SDK |
+| `CLAUDE_PROXY_IDLE_TIMEOUT_SECONDS` | `120` | HTTP keep-alive timeout |
+| `CLAUDE_PROXY_TELEMETRY_SIZE` | `1000` | Telemetry ring buffer size |
 
-## Concurrency
+## Endpoints
 
-The proxy supports concurrent requests, but the SDK's `cli.js` subprocess can segfault during stream cleanup ([oven-sh/bun#17947](https://github.com/oven-sh/bun/issues/17947)). Responses are always delivered correctly; the crash occurs after completion. The supervisor auto-restarts within a few seconds.
+| Endpoint | Description |
+|----------|-------------|
+| `GET /` | Landing page (HTML) or status JSON (`Accept: application/json`) |
+| `POST /v1/messages` | Anthropic Messages API |
+| `POST /messages` | Alias for `/v1/messages` |
+| `GET /health` | Auth status, subscription type, mode |
+| `GET /telemetry` | Performance dashboard |
+| `GET /telemetry/requests` | Recent request metrics (JSON) |
+| `GET /telemetry/summary` | Aggregate statistics (JSON) |
+| `GET /telemetry/logs` | Diagnostic logs (JSON) |
 
-> The [opencode-with-claude](https://github.com/ianjwhite99/opencode-with-claude) launcher avoids this by giving each terminal its own proxy on a random port.
+## Docker
+
+```bash
+docker run -v ~/.claude:/home/claude/.claude -p 3456:3456 meridian
+```
+
+Or with docker-compose:
+
+```bash
+docker compose up -d
+```
+
+## Testing
+
+```bash
+npm test          # 339 unit/integration tests (bun test)
+npm run build     # Build with bun + tsc
+```
+
+Three test tiers:
+
+| Tier | What | Speed |
+|------|------|-------|
+| Unit | Pure functions, no mocks | Fast |
+| Integration | HTTP layer with mocked SDK | Fast |
+| E2E | Real proxy + real Claude Max ([`E2E.md`](E2E.md)) | Manual |
 
 ## FAQ
 
-### Does this work without oh-my-opencode?
+**Is this allowed by Anthropic's terms?**
+Meridian uses the official Claude Code SDK — the same SDK Anthropic publishes and maintains for programmatic access. It authenticates through your existing Claude Max session using OAuth, not API keys. Nothing is modified, reverse-engineered, or bypassed.
 
-Yes. Both modes work with native OpenCode and any custom agents. oh-my-opencode just adds more agents and model routing.
+**How is this different from using an API key?**
+API keys are billed per token. Your Max subscription is a flat monthly fee with higher rate limits. Meridian lets you use that subscription from any compatible tool.
 
-### Why do I need `ANTHROPIC_API_KEY=dummy`?
+**Does it work with Claude Pro?**
+It works with any Claude subscription that supports the Claude Code SDK. Max is recommended for the best rate limits.
 
-OpenCode requires an API key to be set. The proxy never uses it — authentication is handled by your `claude login` session through the Agent SDK.
+**What happens if my session expires?**
+The SDK handles token refresh automatically. If it can't refresh, Meridian returns a clear error telling you to run `claude login`.
 
-### What about rate limits?
+## Contributing
 
-Your Claude Max subscription has its own usage limits. The proxy doesn't add any additional limits.
-
-### Is my data sent anywhere else?
-
-No. The proxy runs locally. Requests go directly to Claude through the official SDK. In passthrough mode, tool execution happens in OpenCode on your machine.
-
-### Why does internal mode use MCP tools?
-
-The Claude Agent SDK uses different parameter names than OpenCode (e.g., `file_path` vs `filePath`). Internal mode provides its own MCP tools with SDK-compatible names. Passthrough mode doesn't need this since OpenCode handles execution directly.
-
-## Troubleshooting
-
-| Problem                       | Solution                                                                  |
-| ----------------------------- | ------------------------------------------------------------------------- |
-| "Authentication failed"       | Run `claude login` to authenticate                                        |
-| "Connection refused"          | Make sure the proxy is running                                            |
-| "Port 3456 is already in use" | `kill $(lsof -ti :3456)` or use `CLAUDE_PROXY_PORT=4567`                  |
-| Title generation fails        | Set `"small_model": "anthropic/claude-haiku-4-5"` in your OpenCode config |
-
-## Auto-start (macOS)
-
-```bash
-cat > ~/Library/LaunchAgents/com.claude-max-proxy.plist << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.claude-max-proxy</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>$(pwd)/bin/claude-proxy-supervisor.sh</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>$(pwd)</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>CLAUDE_PROXY_PASSTHROUGH</key>
-        <string>1</string>
-    </dict>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-</dict>
-</plist>
-EOF
-
-launchctl load ~/Library/LaunchAgents/com.claude-max-proxy.plist
-```
-
-## Development
-
-```bash
-bun test                              # Run tests
-curl http://127.0.0.1:3456/health     # Auth status, subscription, mode
-```
-
-### Architecture
-
-```
-src/
-├── proxy/
-│   ├── server.ts      # HTTP server, passthrough/internal modes, SSE streaming, session resume
-│   ├── agentDefs.ts   # Extract SDK agent definitions from OpenCode's Task tool
-│   ├── agentMatch.ts  # Fuzzy matching for agent names (6-level priority)
-│   └── types.ts       # ProxyConfig types and defaults
-├── mcpTools.ts        # MCP tool definitions for internal mode (read, write, edit, bash, glob, grep)
-├── logger.ts          # Structured logging with AsyncLocalStorage context
-├── plugin/
-    └── claude-max-headers.ts  # OpenCode plugin for session header injection
-```
-
-## Disclaimer
-
-This is an **unofficial wrapper** around Anthropic's publicly available [Claude Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk). It is not affiliated with, endorsed by, or supported by Anthropic.
-
-**Use at your own risk.** It is your responsibility to review and comply with [Anthropic's Terms of Service](https://www.anthropic.com/legal/consumer-terms) and [Authorized Usage Policy](https://www.anthropic.com/legal/aup).
-
-This project calls `query()` from Anthropic's public npm package using your own authenticated account. No API keys are intercepted, no authentication is bypassed, and no proprietary systems are reverse-engineered.
+Issues and PRs welcome. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for module structure and dependency rules, [`CLAUDE.md`](CLAUDE.md) for coding guidelines, and [`E2E.md`](E2E.md) for end-to-end test procedures.
 
 ## License
 
 MIT
-
-## Credits
-
-Built with the [Claude Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) by Anthropic.
-
-[opencode-with-claude](https://github.com/ianjwhite99/opencode-with-claude) installer by [@ianjwhite99](https://github.com/ianjwhite99). Multimodal support based on work by [@juanferreiramorel](https://github.com/juanferreiramorel). Per-terminal proxy idea by [@calebdw](https://github.com/calebdw). README cleanup by [@skipships](https://github.com/skipships).

@@ -173,6 +173,77 @@ describe("verifyLineage", () => {
     }
   })
 
+  it("returns continuation (not undo) when messages grow with a modified message", () => {
+    // Reproduces the false undo bug: conversation grows from 7 to 9 messages
+    // but message[6] was modified (e.g., cache_control added by OpenCode).
+    const msgs = [
+      msg("user", "a"), msg("assistant", "b"),
+      msg("user", "c"), msg("assistant", "d"),
+      msg("user", "e"), msg("assistant", "f"),
+      msg("user", "g"),
+    ]
+    const hashes = computeMessageHashes(msgs)
+    const session = makeSession({
+      lineageHash: computeLineageHash(msgs),
+      messageCount: msgs.length,
+      messageHashes: hashes,
+      sdkMessageUuids: [null, "uuid-1", null, "uuid-2", null, "uuid-3", null],
+    })
+    // Same conversation but message[6] is modified and 2 new messages added
+    const extended = [
+      msg("user", "a"), msg("assistant", "b"),
+      msg("user", "c"), msg("assistant", "d"),
+      msg("user", "e"), msg("assistant", "f"),
+      msg("user", "g-modified"),  // Modified last message
+      msg("assistant", "h"),      // New
+      msg("user", "i"),           // New
+    ]
+    const result = verifyLineage(session, extended, "key", mockCache)
+    // Should be continuation, NOT undo — the conversation grew
+    expect(result.type).toBe("continuation")
+  })
+
+  it("returns undo when same count but last message replaced", () => {
+    // Same message count with last message changed = user replaced last message (undo + retype)
+    const msgs = [
+      msg("user", "a"), msg("assistant", "b"),
+      msg("user", "c"), msg("assistant", "d"),
+    ]
+    const hashes = computeMessageHashes(msgs)
+    const session = makeSession({
+      lineageHash: computeLineageHash(msgs),
+      messageCount: msgs.length,
+      messageHashes: hashes,
+      sdkMessageUuids: [null, "uuid-1", null, "uuid-2"],
+    })
+    // Same count, but last message changed — this is undo + new message
+    const modified = [
+      msg("user", "a"), msg("assistant", "b"),
+      msg("user", "c"), msg("assistant", "d-modified"),
+    ]
+    const result = verifyLineage(session, modified, "key", mockCache)
+    expect(result.type).toBe("undo")
+  })
+
+  it("returns undo when fewer messages", () => {
+    const msgs = [
+      msg("user", "a"), msg("assistant", "b"),
+      msg("user", "c"), msg("assistant", "d"),
+      msg("user", "e"),
+    ]
+    const hashes = computeMessageHashes(msgs)
+    const session = makeSession({
+      lineageHash: computeLineageHash(msgs),
+      messageCount: msgs.length,
+      messageHashes: hashes,
+      sdkMessageUuids: [null, "uuid-1", null, "uuid-2", null],
+    })
+    // Fewer messages — clear undo
+    const undone = [msg("user", "a"), msg("assistant", "b"), msg("user", "new")]
+    const result = verifyLineage(session, undone, "key", mockCache)
+    expect(result.type).toBe("undo")
+  })
+
   it("returns compaction when suffix matches on long conversation", () => {
     // Need >= 6 stored messages and >= MIN_SUFFIX_FOR_COMPACTION suffix overlap
     const msgs = [
